@@ -1,56 +1,10 @@
 //LIBRERÍAS****************************************************************************************************************************************************************************************************
 
 //Librerias para uso de memora micro SD
-#include <SD.h>
-#include <SPI.h>
-
-//Librerías para RTC Reloj de Tiempo Real
-#include <RTClib.h>
-
-//Librería para uso de memoria interna del Arduino EEPROM
-#include <EEPROM.h>
-
-//Librerías para separar información por el caracter ";"
-#include <Separador.h>
-
-//Librería para sensor conductividad
-#include "GravityTDS.h"
-
-
-
-
-//VARIABLES Y CONSTANTES DEL PROGRAMA ***************************************************************************************************************************************************************************
-
 //Módulo SIM GSM
 #define ledDeConexionaRed 8 // Pin digital 8 para indicar si hay conexión a red    
 #define resetSim800l 5 //Pin digital 5 asignado para resetear el modulo SIM800L
 int contadorDeIntentosDeConexion;
-
-//Módulo micro SD
-#define pinLectorSD 53 //Pin para lectura de información del modulo microSD  
-File file;             //Objeto file que nos servira para manipular archivos
-Separador s, z, y;     //Se crea objeto para separar mensaje.
-
-//Módulo RTC
-RTC_DS3231 rtc;        //Se crea objeto del tipo RTC_DS3231 como Reloj de Tiempo Real
-
-//Módulo para sensor distancia ultrasonido
-const int echoPin = 6;
-const int triggerPin = 7;
-
-//Módulo conductividad eléctrica
-GravityTDS gravityTds;
-#define TdsSensorPin A1
-#define VREF 5.0      // analog reference voltage(Volt) of the ADC
-#define SCOUNT  30           // sum of sample point
-float averageVoltage = 0, tdsValue = 0, temperature = 25;
-float factorCE = 1;
-
-
-//Variables lectura informacion SD
-String primerComilla;
-String cuerpoMensaje;
-bool leerSD;
 
 //VAriables envio de mensajes SMS
 String commands;
@@ -80,7 +34,6 @@ int alturaSensor;
 int medidaCE;
 int horaParaEnvioDeInforme; //Hora para envio de informe
 
-//****************************************************************************************************************************************************************************************************************************
 
 void setup() {
   Serial.begin(115200);
@@ -96,11 +49,6 @@ void setup() {
   pinMode(triggerPin, OUTPUT); //pin como salida
   pinMode(echoPin, INPUT);  //pin como entrada
   digitalWrite(triggerPin, LOW);//Inicializamos el pin con 0
-  gravityTds.setPin(TdsSensorPin);
-  gravityTds.setAref(5.0);  //reference voltage on ADC, default 5.0V on Arduino UNO
-  gravityTds.setAdcRange(1024);  //1024 for 10bit ADC;4096 for 12bit ADC
-  gravityTds.begin();  //initialization
-
 
   //Intentar conexión a red
   contadorDeIntentosDeConexion=0;
@@ -111,94 +59,6 @@ void setup() {
   Serial.println("SE LOGRÓ LA CONEXIÓN A RED");
   Serial.println();
   Serial.println();
-
-  //Mostrar datos de monitoreo guardados en memoria del Arduino
-  Serial.println("A continuación se muestran los valores guardados en la memoria para el próximo reporte diario");
-  Serial.println(readEEPROM(22, 100));
-  Serial.println(readEEPROM(22, 200));
-  Serial.println(readEEPROM(22, 300));
-  Serial.println(readEEPROM(22, 400));
-  Serial.println(readEEPROM(22, 500));
-  Serial.println(readEEPROM(22, 600));
-  Serial.println(readEEPROM(22, 700));
-  Serial.println(readEEPROM(22, 800));
-  Serial.println();
-  Serial.println();
-
-
-  //Inicio módulo RTC
-  if (! rtc.begin()) {                            // si falla la inicializacion del modulo
-    Serial.println("Modulo RTC no encontrado !");  // muestra mensaje de error
-    Serial.flush();
-    abort();
-  }
-  delay(500);
-
-
-  //Iniciar módulo micro SD
-  if (!SD.begin(pinLectorSD)) {
-    Serial.println("Modulo micro SD no encontrado");
-    while (1);
-  }
-  delay(500);
-  leerSD = true;
-  Serial.println("INICIA IMORTACIÓN DE DATOS DESDE MEMORIA MICRO SD, LOS DATOS SON LOS SIGUIENTES:");
-  separateData("");
-
-
-  //Configuración parámetros-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  timeSendMSN = 1800000;               // Tiempo para envio de mensajes: 1000 es un segundo
-  alturaSensor = (datos[1]).toInt();
-  maximaCE = (datos[2]).toInt();
-  horaParaEnvioDeInforme = 17;
-
-  Serial.println();
-  Serial.println();
-  Serial.print("El actual factor de calibración para el sensor de conductividad es: ");
-  EEPROM.get(1000, factorCE); //El valor por defecto fue 0356, para modificarlo correr este código una vez: EEPROM.write(800, factorCE);
-  Serial.println(factorCE);  
-  medida = medirdistancia(triggerPin, echoPin);
-  medidaCE = medirCE();
-  Serial.println();
-  Serial.println();  
-  Serial.print("Primer medida realizada con exito el ");
-  DateTime fecha = rtc.now();
-  Serial.print(fecha.day());
-  Serial.print("/");
-  Serial.print(fecha.month());
-  Serial.print(", a las ");
-  Serial.print(fecha.hour());
-  Serial.print(":");
-  Serial.println(fecha.minute());
-  Serial.print("CE: ");
-  Serial.print(medidaCE);
-  Serial.print("µS, Nivel: ");
-  Serial.print(medida);
-  Serial.println("cm");
-  Serial.println();
-
-
-  conteoMedida = EEPROM.read(15); // Actualiza el contador desde la memoria de arduino
-  conteoInterno = EEPROM.read(20); // Actualiza el contador desde la memoria de arduino
-  enviarMensaje = EEPROM.read(1100); // Actualiza el contador desde la memoria de arduino
-  //enviarMensaje=true;
-
-  Serial.print("conteoMedida(0-5): ");
-  Serial.println(conteoMedida);
-  Serial.print("conteoInterno(0-7): ");
-  Serial.println(conteoInterno);
-  Serial.print("Se enviará mensaje?: ");
-  Serial.println(enviarMensaje);
-  Serial.println();
-  Serial.println();
-
-  Serial.println("Sistema de seguimiento iniciado correctamente...");
-  Serial.println();
-  Serial.println();
-  Serial.println();
-  Serial.println();
-}
-
 
 //************************************************************************************************************************************************************************************************************************
 
@@ -228,9 +88,6 @@ void loop() {
 
 
 //FUNCIONES Y MÓDULOS***************************************************************************************************************************************************************************************************
-
-
-
 
 void ComprobarInformacionDeEntrada() {
   Serial.println("Buscando si hay mensaje");
@@ -273,95 +130,6 @@ void ComprobarInformacionDeEntrada() {
 
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------//
-//FUNCION PARA TOMAR MEDICIONES CADA TIEMPO DETERMINADO
-void readLecturaMedidas() {
-
-  unsigned long tiempoActualMSN = millis(); //Inicio contador
-  if ((unsigned long)(tiempoActualMSN - tiempoPrevioMSN) >= timeSendMSN) {
-
-
-    //sendAtConectionRed();
-    medida = medirdistancia(triggerPin, echoPin);
-    delay(1000);
-    medidaCE = medirCE();
-    delay(1000);
-    EEPROM.write(10, medida);
-    delay(1000);
-    EEPROM.write(40, medidaCE);
-    Serial.print("Conteo repetición: ");
-    Serial.println( conteoMedida + 1);
-    Serial.print("Conteo Serie: ");
-    Serial.println( conteoInterno);    
-    Serial.print("Medida nivel: ");
-    Serial.print(medida);
-    //Serial.print(EEPROM.read(10));
-    Serial.println(" cm");
-    Serial.print("Medida CE: ");    
-    Serial.print(medidaCE);
-    Serial.println("µS");
-    Serial.println();
-    //verDatosInforme();
-    Serial.println("");
-    // Serial.print(EEPROM.read(40));
-    conteoMedida++;
-    EEPROM.write(15, conteoMedida);
-    if (conteoMedida > 5) {
-      conteoMedida = 0;
-      EEPROM.write(15, conteoMedida);
-
-
-      //        medida  = EEPROM.read(10);
-      //        medidaCE = EEPROM.read(40);
-      DateTime fecha = rtc.now();
-      info = String(fecha.day(), DEC) + "/" + String(fecha.month(), DEC) + "," + String(fecha.hour(), DEC) + ":" + String(fecha.minute(), DEC) + ";" + medida + ";" + medidaCE;
-      Serial.println(info);
-      datosInforme[conteoInterno] = info;
-      dataInfo = datosInforme[conteoInterno];
-
-      EEPROM.write(20, conteoInterno);
-      saveDataInfo(conteoInterno, dataInfo);
-      conteoInterno++;
-      if (conteoInterno > 7) {
-        conteoInterno = 0;
-        EEPROM.write(20, conteoInterno);
-      }
-
-      delay(500);
-      file = SD.open("datos.csv", FILE_WRITE);
-      if (file) {
-        file.print(fecha.day());
-        file.print("/");
-        file.print(fecha.month());
-        file.print(",");
-        file.print(fecha.hour());
-        file.print(":");
-        file.print(fecha.minute());
-        file.print(";");
-        file.print(medida);
-        file.print(";");
-        file.println(medidaCE);
-        file.close();
-        Serial.print(conteoInterno);
-        Serial.println("° Registro exitoso para informe diario");
-        Serial.println("");
-
-      } else {
-        Serial.println("Falla en registro");
-      }
-    }
-
-    if (medidaCE > maximaCE)
-      envioMensajeAlerta();
-
-    tiempoPrevioMSN = tiempoActualMSN;
-  }
-}
-
-
-
-
-
-
 //-----------------------------------------------------------------------------------------------------------------------------------------------//
 //FUNCIÓN PARA ENVIAR INFORME DIARIO
 void envioInforme() {
@@ -488,108 +256,6 @@ void sendAtConectionRed() {
 
 
 
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
-//FUNCIÓN PARA MEDIR CE
-int medirCE() {
-  //temperature = readTemperature();  //add your temperature sensor and read it
-  gravityTds.setTemperature(temperature);  // set the temperature and execute temperature compensation
-  gravityTds.update();  //sample and calculate
-  tdsValue = gravityTds.getTdsValue();  // then get the value
-  //    Serial.print(tdsValue,0);
-  //    Serial.println("ppm");
-  //    delay(1000);
-  //Serial.println(factorCE);
-  return (tdsValue * factorCE);
-}
-
-
-
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
-//FUNCIÓN PARA SACAR EL VALOR PROMEDIO DE LA CE
-int getMedianNum(int bArray[], int iFilterLen)
-{
-  int bTab[iFilterLen];
-  for (byte i = 0; i < iFilterLen; i++)
-    bTab[i] = bArray[i];
-  int i, j, bTemp;
-  for (j = 0; j < iFilterLen - 1; j++)
-  {
-    for (i = 0; i < iFilterLen - j - 1; i++)
-    {
-      if (bTab[i] > bTab[i + 1])
-      {
-        bTemp = bTab[i];
-        bTab[i] = bTab[i + 1];
-        bTab[i + 1] = bTemp;
-      }
-    }
-  }
-  if ((iFilterLen & 1) > 0)
-    bTemp = bTab[(iFilterLen - 1) / 2];
-  else
-    bTemp = (bTab[iFilterLen / 2] + bTab[iFilterLen / 2 - 1]) / 2;
-  return bTemp;
-}
-
-
-
-
-
-
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
-//función para escribir en la memoria interna de arduino eeprom
-void writeEEPROM(String dto, int posIni) {
-  for (int i = posIni; i < (dto.length() + posIni); i++) {
-    EEPROM.write(i, dto[i - posIni]);
-  }
-  delay(400);
-}
-
-
-
-
-
-
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
-//función para leer de la memoria interna de arduino eeprom
-String readEEPROM(int t, int posIni) {
-
-  String texto;
-  Serial.println();
-  for (int i = posIni; i < (t + posIni); i++) {
-    byte z = EEPROM.read(i);
-
-    char a = char(z);
-    texto += a;
-  }
-  delay(400);
-  return texto;
-}
-
-
-
-
-
-
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
-//FUNCIÓN PARA GUARDAR DATOS DEL INFORME EN POSICIONES ESPECÍFICAS DE LA EEPROM
-void saveDataInfo(int conteoInterno, String dataInfo) {
-  Serial.println(dataInfo);
-  
-  switch (conteoInterno) {
-    case 0: writeEEPROM(dataInfo, 100); break;
-    case 1: writeEEPROM(dataInfo, 200); break;
-    case 2: writeEEPROM(dataInfo, 300); break;
-    case 3: writeEEPROM(dataInfo, 400); break;
-    case 4: writeEEPROM(dataInfo, 500); break;
-    case 5: writeEEPROM(dataInfo, 600); break;
-    case 6: writeEEPROM(dataInfo, 700); break;
-    case 7: writeEEPROM(dataInfo, 800); break;
-  }
-}
-
-
-
 
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------//
@@ -633,34 +299,6 @@ int8_t enviarComandoAT(char* comandoAT, char* respEsperada, unsigned int retardo
 
 
 //-----------------------------------------------------------------------------------------------------------------------------------------------//
-//LEER DATOS DESDE LA MEMORIA SD CREANDO UN STRING LLAMADO TEXTO
-String readDataSD() {
-
-  String texto;
-  bool val = SD.begin(pinLectorSD);
-  if (not val)
-    Serial.println("No se ha podido inicializar la tarjeta SD");
-  else {
-    file = SD.open("fichero.txt", FILE_READ); //nOMBRE DEL FICHERO QUE SE LEE
-    if (not file)
-      Serial.println("No se ha podido abrir el fichero");
-    else {
-
-      char c = file.read();
-      while (c != -1) { //Leemos hasta el final
-        //Serial.print(c);
-        c = file.read();
-        texto += c;
-      }
-      file.close();
-    }
-  }
-  return texto;
-}
-
-
-
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
 //FUNCION para leer información de los mensajes de texto para mandar informe si es solicitado, retorna el texto del mensaje
 
 String readSIM800L() {
@@ -680,43 +318,6 @@ String readSIM800L() {
 }
 
 
-
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
-//Separa textos por los punto y coma que contienen. Esta función tambien lee la información de la memoria SD
-void separateData(String dato) {
-
-  if (dato.startsWith("\r\n+CMT: ")) {
-    primerComilla = s.separa(dato, '"', 0);
-    numMovil = s.separa(dato, '"', 1);
-    cuerpoMensaje = s.separa(dato, '\n', 2);
-    numString = z.separa(cuerpoMensaje, ';', 0);
-    commands = z.separa(cuerpoMensaje, ';', 1);
-    //        numInt = numString.toInt();
-
-    Serial.print("Numero:");
-    Serial.println(numMovil);
-    //        Serial.print("Caso:");
-    //        Serial.println(numInt);
-    Serial.print("Parametro:");
-    Serial.println(commands);
-    a = true;
-  }
-
-  if (leerSD) {
-    for (int i = 0; i < canDatos; i++) {
-      datos[i] = s.separa(readDataSD(), ';', i);
-    }
-
-    delay(10);
-    for (int j = 1; j < canDatos; j++) {
-      Serial.print("Dato No ");
-      Serial.print(j);
-      Serial.println(" : " + datos[j]);
-    }
-    leerSD = false;
-  }
-}
-
 void EnviaSMS(String texto, String numero) {
   Serial1.println("AT+CMGF=1");                 // Activamos la funcion de envio de SMS
   delay(100);                                    // Pequeña pausa
@@ -728,27 +329,4 @@ void EnviaSMS(String texto, String numero) {
   delay(100);                                    // Pequeña pausa
   Serial1.println("");                          // Enviamos un fin de linea
   delay(100);                                    // Pequeña pausa
-}
-
-//-----------------------------------------------------------------------------------------------------------------------------------------------//
-//FUNCIÓN PARA MEDIR ALTURA DEL AGUA, RETORNA EL VALOR PROMEDIO DE 10 MEDICIONES
-int medirdistancia(int trigger, int echo) {
-
-  float valorSensorAcumulado = 0;
-  long duration, distanceCm;
-
-  for (int i = 0; i < 10; i++) {
-    digitalWrite(trigger, LOW);         //para generar un pulso limpio ponemos a LOW 4us
-    delayMicroseconds(4);
-    digitalWrite(trigger, HIGH);        //generamos Trigger (disparo) de 10us
-    delayMicroseconds(10);
-    digitalWrite(trigger, LOW);
-
-    duration = pulseIn(echo, HIGH);     //medimos el tiempo entre pulsos, en microsegundos
-
-    distanceCm = duration * 10 / 292 / 2;  //convertimos a distancia, en cm
-    delay(100);
-    valorSensorAcumulado += distanceCm;
-  }
-  return alturaSensor - (valorSensorAcumulado / 10);
 }
